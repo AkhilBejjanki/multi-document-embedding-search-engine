@@ -3,19 +3,26 @@ from sentence_transformers import SentenceTransformer
 
 class Embedder:
     def __init__(self):
-        # Force ONNX runtime, disable torch
+        # Ultra-small model (renders instantly)
         self.model = SentenceTransformer(
-            "sentence-transformers/all-MiniLM-L6-v2",
-            device="cpu",
-            trust_remote_code=True
+            "sentence-transformers/paraphrase-MiniLM-L3-v2",
+            device="cpu"
         )
 
     def embed_text(self, text: str) -> np.ndarray:
-        emb = self.model.encode([text], convert_to_numpy=True, normalize_embeddings=False)
+        emb = self.model.encode(
+            [text],
+            convert_to_numpy=True,
+            normalize_embeddings=False
+        )
         return emb[0].astype(np.float32)
 
     def embed_texts(self, texts: list) -> np.ndarray:
-        embs = self.model.encode(texts, convert_to_numpy=True, normalize_embeddings=False)
+        embs = self.model.encode(
+            texts,
+            convert_to_numpy=True,
+            normalize_embeddings=False
+        )
         return embs.astype(np.float32)
 
     def normalize_embeddings(self, embs: np.ndarray):
