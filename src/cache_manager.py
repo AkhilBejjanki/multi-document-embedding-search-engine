@@ -1,60 +1,51 @@
-# src/cache_manager.py
 import os
 import json
 import hashlib
-import time
-from typing import Optional, Dict
 import numpy as np
 
-CACHE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "cached")
-os.makedirs(CACHE_DIR, exist_ok=True)
-
-def sha256_text(text: str) -> str:
-    h = hashlib.sha256()
-    h.update(text.encode("utf-8"))
-    return h.hexdigest()
-
 class CacheManager:
-    """
-    JSON per-document cache. Each doc will have a file cached/<doc_id>.json
-    Structure:
-    {
-      "doc_id": "doc_001",
-      "hash": "sha256_of_text",
-      "embedding": [...],
-      "updated_at": 1234567890.0
-    }
-    """
-    def __init__(self, cache_dir: str = CACHE_DIR):
-        self.cache_dir = os.path.abspath(cache_dir)
+    def __init__(self, cache_dir="cached"):
+        self.cache_dir = cache_dir
         os.makedirs(self.cache_dir, exist_ok=True)
 
-    def get_cache_path(self, doc_id: str) -> str:
+    def _path(self, doc_id):
+        return os.path.join(self.cache_dir, f"{doc_id}.npy")
+
+    def _meta_path(self, doc_id):
         return os.path.join(self.cache_dir, f"{doc_id}.json")
 
-    def load(self, doc_id: str) -> Optional[Dict]:
-        p = self.get_cache_path(doc_id)
-        if not os.path.exists(p):
-            return None
-        with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
+    def save(self, doc_id, hash_value, embedding):
+        """Save embedding + metadata."""
+        np.save(self._path(doc_id), embedding)
 
-    def save(self, doc_id: str, text_hash: str, embedding: np.ndarray):
-        p = self.get_cache_path(doc_id)
-        payload = {
-            "doc_id": doc_id,
-            "hash": text_hash,
-            "embedding": embedding.tolist(),
-            "updated_at": time.time()
-        }
-        with open(p, "w", encoding="utf-8") as f:
-            json.dump(payload, f)
+        meta = {"hash": hash_value}
+        with open(self._meta_path(doc_id), "w") as f:
+            json.dump(meta, f)
 
-    def get_embedding_if_valid(self, doc_id: str, text_hash: str) -> Optional[np.ndarray]:
-        rec = self.load(doc_id)
-        if not rec:
+    def get_embedding_if_valid(self, doc_id, hash_value):
+        """Check cached hash. If match → return embedding."""
+        meta_path = self._meta_path(doc_id)
+        emb_path = self._path(doc_id)
+
+        if not os.path.exists(meta_path) or not os.path.exists(emb_path):
             return None
-        if rec.get("hash") != text_hash:
+
+        try:
+            with open(meta_path, "r") as f:
+                meta = json.load(f)
+        except:
             return None
-        emb = np.array(rec["embedding"], dtype=np.float32)
-        return emb
+
+        if meta.get("hash") != hash_value:
+            return None
+
+        try:
+            emb = np.load(emb_path)
+            return emb
+        except:
+            return None
+
+
+# Helper hashing function used in SearchEngine
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
