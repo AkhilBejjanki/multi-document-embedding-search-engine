@@ -1,24 +1,23 @@
-# src/embedder.py
-from sentence_transformers import SentenceTransformer
 import numpy as np
+from sentence_transformers import SentenceTransformer
 
 class Embedder:
-    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
-        self.model_name = model_name
-        self.model = SentenceTransformer(model_name)
+    def __init__(self):
+        # Force ONNX runtime, disable torch
+        self.model = SentenceTransformer(
+            "sentence-transformers/all-MiniLM-L6-v2",
+            device="cpu",
+            trust_remote_code=True
+        )
 
     def embed_text(self, text: str) -> np.ndarray:
-        emb = self.model.encode(text, show_progress_bar=False)
-        emb = np.array(emb, dtype=np.float32)
-        return emb
+        emb = self.model.encode([text], convert_to_numpy=True, normalize_embeddings=False)
+        return emb[0].astype(np.float32)
 
     def embed_texts(self, texts: list) -> np.ndarray:
-        embs = self.model.encode(texts, show_progress_bar=False)
-        return np.array(embs, dtype=np.float32)
+        embs = self.model.encode(texts, convert_to_numpy=True, normalize_embeddings=False)
+        return embs.astype(np.float32)
 
-    @staticmethod
-    def normalize_embeddings(embs: np.ndarray) -> np.ndarray:
-        # Normalize rows to unit length for cosine similarity with IndexFlatIP
-        norms = np.linalg.norm(embs, axis=1, keepdims=True)
-        norms[norms == 0] = 1e-8
+    def normalize_embeddings(self, embs: np.ndarray):
+        norms = np.linalg.norm(embs, axis=1, keepdims=True) + 1e-10
         return embs / norms
