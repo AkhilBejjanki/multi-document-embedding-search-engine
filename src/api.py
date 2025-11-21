@@ -4,16 +4,32 @@ import os
 
 from src.search_engine import SearchEngine
 
-app = FastAPI(title="Embedding Search Engine")
+app = FastAPI(title="Multi-Document Embedding Search Engine")
 
 # Lazy initialization
 ENGINE = None
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
+
+# Root route (Fixes Homepage)
+
+@app.get("/")
+def home():
+    return {
+        "status": "ok",
+        "message": "Embedding Search API is running",
+        "endpoints": ["/search", "/docs"]
+    }
+
+
+
+# Request model
 class SearchRequest(BaseModel):
     query: str
     top_k: int = 5
 
+
+# Lazy engine loader (prevents Render from freezing on startup)
 def get_engine():
     global ENGINE
     if ENGINE is None:
@@ -22,6 +38,8 @@ def get_engine():
         ENGINE.build()
     return ENGINE
 
+
+# Search endpoint
 @app.post("/search")
 def search(req: SearchRequest):
     engine = get_engine()
