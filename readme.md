@@ -195,13 +195,3 @@ See `requirements.txt` for dependencies. Key packages:
 
 ---
 
-## 📝 License
-
-This project is for educational purposes as part of an AI Engineer Intern Assignment.
-
----
-
-
-## 📧 Contact
-
-For questions or feedback, please reach out via GitHub issues.
