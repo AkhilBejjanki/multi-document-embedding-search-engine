@@ -1,86 +1,207 @@
-# Multi-document Embedding Search Engine with Caching
+# Multi-Document Embedding Search Engine
 
-## Overview
-Lightweight embedding-based search engine over text files with:
-- Embeddings via `sentence-transformers/all-MiniLM-L6-v2`
-- Local JSON cache (per-document)
-- FAISS Index (IndexFlatIP) with normalized embeddings
-- FastAPI `/search` endpoint
-- Simple ranking explanation (keyword overlap + length normalization)
-
-## Folder structure
-project/
-├─ src/ # core code files
-├─ data/ # put your .txt documents here (gitignored)
-├─ cached/ # JSON cache created automatically
-├─ requirements.txt
-└─ README.md
+A lightweight semantic search engine that loads multiple text documents, generates embeddings, caches them, and performs similarity-based search with explanations.
 
 
-## How caching works
-For each `doc_id` a JSON file is stored in `cached/<doc_id>.json`:
-```json
-{
- "doc_id": "doc_001",
- "hash": "sha256_of_cleaned_text",
- "embedding": [...],
- "updated_at": 1234567890.0
-}
+---
 
-On build, the system computes the SHA-256 of the cleaned text and checks cache. If unchanged, cached embedding is reused; if changed, a new embedding is generated and cached.
+## 1. How Caching Works
 
-How to run
+The project uses a simple but effective caching system stored inside:
 
-Create virtualenv and install dependencies:
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+```
+cached/
+├── <doc_id>.npy
+└── <doc_id>.json
+```
 
-Put your .txt files under data/ (filenames like doc_001.txt).
+### How it works:
 
-Start the API:
+1. Every document is cleaned and hashed using **SHA-256**
+2. Before generating embeddings, the system checks:
+   - If an embedding file exists for that document
+   - If the stored hash matches the current hash
+3. **If both match** → cached embedding is reused (fast, no recomputation)
+4. **If not** → a new embedding is generated, stored in `cached/`, and used
 
+### Benefits:
+
+- ⚡ Faster startup
+- 🔄 Only changed/new documents get re-embedded
+- 💾 Ideal for local development and large datasets
+
+---
+
+## 2. How to Run Embedding Generation
+
+Embeddings are generated automatically when the search engine is built.
+
+### Steps:
+
+1. Place your `.txt` documents inside:
+   ```
+   data/
+   ```
+
+2. Run the following command:
+   ```bash
+   python -m src.api
+   ```
+
+### On first run:
+
+- The system loads all documents
+- Generates embeddings for uncached documents
+- Saves them in `cached/`
+
+### On next runs:
+
+- Cached embeddings load instantly
+- No model call needed unless a document changed
+
+---
+
+## 3. How to Start the API
+
+Make sure you are in the project's root folder and run:
+
+```bash
+uvicorn src.api:app --reload
+```
+
+**OR:**
+
+```bash
 python -m src.api
+```
 
+This starts a FastAPI server at:
 
-The server runs at http://0.0.0.0:8000.
+```
+http://127.0.0.1:8000
+```
 
-Example request
+### API Documentation
 
-POST http://localhost:8000/search
-Body:
+Open the interactive Swagger UI:
 
-{"query":"quantum physics basics", "top_k":5}
+```
+http://127.0.0.1:8000/docs
+```
 
-Design choices
+You can test:
 
-FAISS IndexFlatIP with normalized embeddings for fast cosine-similarity retrieval.
-
-JSON per-doc cache for simplicity and easy debugging.
-
-Sentence-Transformers model provides a good speed/accuracy tradeoff.
-
-Notes
-
-For many documents or production, consider persistent FAISS index file and SQLite cache.
-
-Optionally add Streamlit UI, batch embedding, or query expansion for improvements.
-
+- `/search`
+- `/explain`
+- `/reload-docs`
+- `/status`
 
 ---
 
-# Quick usage tips & troubleshooting
-- If `faiss-cpu` fails to install, run with `use_faiss=False` in `src/api.py` and `src/search_engine.py`; code falls back to numpy cosine similarity.
-- Ensure `data/` contains `.txt` files and `cached/` is writable.
-- If embeddings seem slow, pre-generate embeddings by running a small script that calls `SearchEngine.build()` once — it caches to `cached/`.
+## 4. Folder Structure
+
+```
+multi-document-embedding-search-engine/
+│
+├── data/                     # All text documents (.txt)
+├── cached/                   # Cached embeddings + metadata
+│
+├── src/
+│   ├── api.py                # FastAPI routes
+│   ├── search_engine.py      # Core search engine logic
+│   ├── embedder.py           # Embedding model (gte-small)
+│   ├── cache_manager.py      # Hashing + caching logic
+│   └── __init__.py
+│
+├── requirements.txt          # Project dependencies
+├── Procfile                  # Start command (Railway/Render)
+└── README.md                 # Project documentation
+```
 
 ---
 
-# Next steps I can do for you (pick any, I’ll do it now)
-1. Generate these files as downloadable files for you.  
-2. Add a small Streamlit UI (`app.py`) to interactively search.  
-3. Swap JSON cache to SQLite and add migrations.  
-4. Add a script to pre-populate embeddings (batch + multiprocessing).  
-5. Provide a short demo script showing curl requests and example outputs.
+## 5. Design Choices
 
-Which one do you want me to do **right now**? (I’ll produce the code/files in this chat immediately.)
+### 🟢 1. Lightweight Embedding Model
+
+**Used:** `thenlper/gte-small`
+
+**Reason:**
+- Very fast on CPU
+- No GPU required
+- Small memory footprint
+- Great performance for semantic search
+
+### 🟢 2. Manual Caching Layer
+
+A simple JSON + NumPy caching system:
+
+- No database required
+- Easy to reset
+- Works offline
+- Perfect for assignment scale
+
+### 🟢 3. Cleaned & Normalized Embeddings
+
+All embeddings are **L2-normalized** so cosine similarity becomes a simple dot product (fast and accurate).
+
+### 🟢 4. Optional FAISS Index
+
+FAISS support is included but disabled by default:
+
+- Python-only version can run without installation issues
+- For large datasets, FAISS gives instant nearest-neighbors search
+
+### 🟢 5. Explanations Included
+
+Every search result includes:
+
+- Overlapping keywords
+- Overlap ratio
+- Length normalization factor
+
+This helps understand why a document was returned.
+
+---
+
+## 6. How to Run the Project Locally (Quick Start)
+
+```bash
+git clone <your_repo>
+cd multi-document-embedding-search-engine
+pip install -r requirements.txt
+python -m src.api
+```
+
+Then open:
+
+```
+http://127.0.0.1:8000/docs
+```
+
+Upload your documents into `data/` and the system handles everything.
+
+---
+
+## 📦 Requirements
+
+See `requirements.txt` for dependencies. Key packages:
+
+- `fastapi`
+- `uvicorn`
+- `sentence-transformers`
+- `numpy`
+- `torch`
+
+---
+
+## 📝 License
+
+This project is for educational purposes as part of an AI Engineer Intern Assignment.
+
+---
+
+
+## 📧 Contact
+
+For questions or feedback, please reach out via GitHub issues.
